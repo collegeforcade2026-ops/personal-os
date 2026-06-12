@@ -29,9 +29,13 @@ export async function FinancePulseCard() {
   const monthlyDelta = latest && prior ? latest.netWorth - prior.netWorth : null;
   const monthlyPct = latest && prior ? pctStr(latest.netWorth, prior.netWorth) : null;
 
-  const { totalSpend, net, topCategory, monthLabel } = txnSummary ?? {};
-  const spendPct = txnSummary && txnSummary.totalIncome
-    ? Math.min(Math.round((txnSummary.totalSpend / txnSummary.totalIncome) * 100), 100)
+  const totalSpend  = txnSummary?.totalSpend ?? 0;
+  const totalIncome = txnSummary?.totalIncome ?? 0;
+  const net         = txnSummary?.net ?? 0;
+  const topCategory = txnSummary?.topCategory ?? null;
+  const monthLabel  = txnSummary?.monthLabel ?? null;
+  const spendPct = totalIncome > 0
+    ? Math.min(Math.round((totalSpend / totalIncome) * 100), 100)
     : 0;
 
   if (!hasBalances) {
@@ -81,13 +85,13 @@ export async function FinancePulseCard() {
       <div className="border-t border-[var(--border)] my-2" />
 
       {/* Cash flow from statement */}
-      {txnSummary ? (
+      {txnSummary && monthLabel ? (
         <>
           <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase mb-1">{monthLabel} · CASH FLOW</p>
           <div className="flex justify-between text-[9px] font-mono mb-1">
-            <span className="text-[var(--ink-3)]">SPEND {totalSpend ? fmt(totalSpend) : "—"}</span>
-            <span className={net && net >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]"}>
-              NET {net ? (net >= 0 ? "+" : "") + fmt(net) : "—"}
+            <span className="text-[var(--ink-3)]">SPEND {fmt(totalSpend)}</span>
+            <span className={net >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]"}>
+              NET {net >= 0 ? "+" : ""}{fmt(net)}
             </span>
           </div>
           <div className="h-0.5 rounded-full bg-[var(--border)] overflow-hidden mb-1.5">
