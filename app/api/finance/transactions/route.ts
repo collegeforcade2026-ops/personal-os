@@ -52,10 +52,11 @@ export async function GET() {
     if (!res.ok) return NextResponse.json({ transactions: [] });
 
     const data = await res.json() as { values?: string[][] };
-    const rows = (data.values ?? []).slice(1); // skip header row
+    // Only include rows where column A looks like a date (skips title/header rows)
+    const rows = (data.values ?? []).filter(r => /^\d{4}-\d{2}-\d{2}/.test(r[0] ?? ""));
 
     const transactions: Transaction[] = rows
-      .filter(r => r[0]) // skip empty rows
+      .filter(r => r[0])
       .map(r => ({
         date: r[0] ?? "",
         description: r[1] ?? "",

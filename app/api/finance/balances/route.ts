@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { appendToSheet, updateSheetCell } from "@/lib/data/writeToSheet";
+import type { Balance } from "@/lib/types/finance";
+
+export type { Balance };
 
 const SHEET_TAB = "Balances";
 
@@ -37,13 +40,6 @@ async function getAccessToken(): Promise<string> {
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
   });
   return ((await tokenRes.json()) as { access_token: string }).access_token;
-}
-
-export interface Balance {
-  account: string;
-  balance: number;
-  updated_at: string;
-  row: number; // 1-indexed sheet row (for updates)
 }
 
 export async function GET() {

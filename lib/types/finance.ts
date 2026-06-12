@@ -5,3 +5,10 @@ export interface Transaction {
   amount: number;
   account: string;
 }
+
+export interface Balance {
+  account: string;
+  balance: number;
+  updated_at: string;
+  row: number;
+}

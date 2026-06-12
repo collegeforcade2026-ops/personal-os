@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Balance } from "@/app/api/finance/balances/route";
+import type { Balance } from "@/lib/types/finance";
 
 const DEFAULT_ACCOUNTS = ["Checking", "Savings / HYSA", "Brokerage", "Credit Card"];
 
