@@ -1,5 +1,4 @@
-import type { Balance, BalanceSummary } from "@/lib/types/finance";
-import { summariseBalances } from "@/lib/types/finance";
+import type { NetWorthSnapshot } from "@/lib/types/finance";
 
 async function getAccessToken(): Promise<string> {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
@@ -37,12 +36,19 @@ async function getAccessToken(): Promise<string> {
   return ((await tokenRes.json()) as { access_token: string }).access_token;
 }
 
-export async function getBalances(): Promise<Balance[]> {
+function periodLabel(period: string): string {
+  // period = "2026-04"
+  const [year, month] = period.split("-");
+  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+  return date.toLocaleString("en-US", { month: "short", year: "numeric" });
+}
+
+export async function getNetWorthHistory(): Promise<NetWorthSnapshot[]> {
   const sheetId = process.env.GOOGLE_SHEETS_FINANCE_ID;
   if (!sheetId || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) return [];
   try {
     const token = await getAccessToken();
-    const range = encodeURIComponent("Balances!A:C");
+    const range = encodeURIComponent("Net Worth History!A:F");
     const res = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`,
       { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: 60 } }
@@ -50,17 +56,16 @@ export async function getBalances(): Promise<Balance[]> {
     if (!res.ok) return [];
     const data = await res.json() as { values?: string[][] };
     return (data.values ?? [])
-      .filter(r => r[0] && r[0] !== "Account")
-      .map((r, i) => ({
-        account: r[0],
-        balance: parseFloat(r[1]) || 0,
-        updated_at: r[2] ?? "",
-        row: i + 2,
-      }));
+      .filter(r => /^\d{4}-\d{2}$/.test(r[0] ?? ""))
+      .map(r => ({
+        period: r[0],
+        periodLabel: periodLabel(r[0]),
+        netWorth:    parseFloat(r[1]) || 0,
+        liquid:      parseFloat(r[2]) || 0,
+        invested:    parseFloat(r[3]) || 0,
+        liabilities: parseFloat(r[4]) || 0,
+        delta:       parseFloat(r[5]) || 0,
+      }))
+      .sort((a, b) => b.period.localeCompare(a.period)); // newest first
   } catch { return []; }
-}
-
-export async function getBalanceSummary(): Promise<BalanceSummary> {
-  const balances = await getBalances();
-  return summariseBalances(balances);
 }
