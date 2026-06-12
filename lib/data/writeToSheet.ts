@@ -58,7 +58,7 @@ export async function appendToSheet(
 ): Promise<void> {
   const token = await getAccessToken();
   const range = encodeURIComponent(`${tabName}!A1`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
 
   const res = await fetch(url, {
     method: "POST",

@@ -62,7 +62,11 @@ export async function getTransactionSummary(): Promise<TransactionSummary | null
 
     const data = await res.json() as { values?: string[][] };
     // Skip any row where column A isn't a date (handles title rows like "TRANSACTION LOG")
-    const rows = (data.values ?? []).filter(r => /^\d{4}-\d{2}-\d{2}/.test(r[0] ?? ""));
+    const rows = (data.values ?? []).filter(r => {
+      const cell = r[0] ?? "";
+      if (!cell || cell === "Date") return false;
+      return /^\d/.test(cell) || /^[A-Za-z]{3}/.test(cell);
+    });
     if (rows.length === 0) return null;
 
     // Find the most recent month in the data

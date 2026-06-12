@@ -53,7 +53,12 @@ export async function GET() {
 
     const data = await res.json() as { values?: string[][] };
     // Only include rows where column A looks like a date (skips title/header rows)
-    const rows = (data.values ?? []).filter(r => /^\d{4}-\d{2}-\d{2}/.test(r[0] ?? ""));
+    const rows = (data.values ?? []).filter(r => {
+      const cell = r[0] ?? "";
+      if (!cell || cell === "Date") return false;
+      // Accept YYYY-MM-DD, MM/DD/YYYY, M/D/YYYY, or any string starting with digits or month names
+      return /^\d/.test(cell) || /^[A-Za-z]{3}/.test(cell);
+    });
 
     const transactions: Transaction[] = rows
       .filter(r => r[0])
