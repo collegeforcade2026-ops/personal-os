@@ -12,8 +12,9 @@ const CATEGORIES = [
 ];
 
 async function parsePdfText(buffer: Buffer): Promise<string> {
+  // Use lib entry directly to avoid pdf-parse loading test files at init (breaks on Vercel)
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
+  const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string }>;
   const data = await pdfParse(buffer);
   return data.text;
 }
