@@ -70,12 +70,25 @@ export async function getTransactionSummary(): Promise<TransactionSummary | null
     if (rows.length === 0) return null;
 
     // Find the most recent month in the data
-    const dates = rows.map(r => r[0]).filter(Boolean).sort();
-    const latestDate = dates[dates.length - 1];
-    const monthPrefix = latestDate.slice(0, 7); // "YYYY-MM"
-    const monthLabel = new Date(latestDate + "T12:00:00").toLocaleString("en-US", { month: "long", year: "numeric" });
+    // Normalize any date string to "YYYY-MM" for grouping
+    function toYearMonth(d: string): string | null {
+      // YYYY-MM-DD
+      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 7);
+      // M/D/YYYY or MM/DD/YYYY
+      const mdy = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, "0")}`;
+      // M/D/YY
+      const mdyShort = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+      if (mdyShort) return `20${mdyShort[3]}-${mdyShort[1].padStart(2, "0")}`;
+      return null;
+    }
 
-    const monthRows = rows.filter(r => r[0]?.startsWith(monthPrefix));
+    const yearMonths = rows.map(r => toYearMonth(r[0] ?? "")).filter(Boolean) as string[];
+    if (yearMonths.length === 0) return null;
+    const latestYearMonth = yearMonths.sort().at(-1)!;
+    const monthLabel = new Date(latestYearMonth + "-15").toLocaleString("en-US", { month: "long", year: "numeric" });
+
+    const monthRows = rows.filter(r => toYearMonth(r[0] ?? "") === latestYearMonth);
 
     let totalIncome = 0;
     let totalSpend = 0;
