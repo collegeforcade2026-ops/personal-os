@@ -12,8 +12,8 @@ const CATEGORIES = [
 ];
 
 async function parsePdfText(buffer: Buffer): Promise<string> {
-  // Dynamically import pdf-parse to avoid Next.js build issues
-  const pdfParse = (await import("pdf-parse")).default;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>;
   const data = await pdfParse(buffer);
   return data.text;
 }
