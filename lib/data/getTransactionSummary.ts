@@ -98,8 +98,10 @@ export async function getTransactionSummary(): Promise<TransactionSummary | null
       const category = r[2] ?? "Other";
       const amount = parseFloat(r[3]) || 0;
       if (PASS_THROUGH.has(category)) continue;
-      if (amount > 0) totalIncome += amount;
-      if (amount < 0) {
+      // Use category as the source of truth — some banks report income as negative
+      if (category === "Income" || category === "Savings & Investing") {
+        totalIncome += Math.abs(amount);
+      } else {
         totalSpend += Math.abs(amount);
         categorySpend[category] = (categorySpend[category] ?? 0) + Math.abs(amount);
       }

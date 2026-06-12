@@ -211,6 +211,7 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
           if (existing) return prev.map(b => b.account === account ? { ...b, balance, updated_at: data.updated_at ?? "" } : b);
           return [...prev, { account, balance, updated_at: data.updated_at ?? "", row: prev.length + 2 }];
         });
+        router.refresh(); // refresh server data so snapshot history updates
       }
     } finally {
       setSaving(false);
