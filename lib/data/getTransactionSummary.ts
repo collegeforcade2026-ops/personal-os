@@ -80,6 +80,12 @@ export async function getTransactionSummary(): Promise<TransactionSummary | null
       // M/D/YY
       const mdyShort = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
       if (mdyShort) return `20${mdyShort[3]}-${mdyShort[1].padStart(2, "0")}`;
+      // Google Sheets serial number (days since 1899-12-30)
+      const serial = parseInt(d);
+      if (!isNaN(serial) && serial > 40000 && serial < 60000) {
+        const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+      }
       return null;
     }
 

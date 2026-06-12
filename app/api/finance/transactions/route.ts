@@ -60,10 +60,22 @@ export async function GET() {
       return /^\d/.test(cell) || /^[A-Za-z]{3}/.test(cell);
     });
 
+    function normalizeDate(d: string): string {
+      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d;
+      const mdy = d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, "0")}-${mdy[2].padStart(2, "0")}`;
+      const serial = parseInt(d);
+      if (!isNaN(serial) && serial > 40000 && serial < 60000) {
+        const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+        return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+      }
+      return d;
+    }
+
     const transactions: Transaction[] = rows
       .filter(r => r[0])
       .map(r => ({
-        date: r[0] ?? "",
+        date: normalizeDate(r[0] ?? ""),
         description: r[1] ?? "",
         category: r[2] ?? "Other",
         amount: parseFloat(r[3]) || 0,
