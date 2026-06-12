@@ -219,14 +219,14 @@ export function UploadZone() {
           </div>
           <div className="p-4 flex flex-col gap-3">
             {[
-              { label: "INCOME", val: totalIncome, color: "text-[var(--ok)]" },
-              { label: "SPEND",  val: totalSpend,  color: "text-[var(--danger)]" },
-              { label: "NET",    val: net,          color: net >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]" },
+              { label: "INCOME", val: totalIncome, prefix: "+",                      color: "text-[var(--ok)]" },
+              { label: "SPEND",  val: totalSpend,  prefix: "-",                      color: "text-[var(--danger)]" },
+              { label: "NET",    val: net,          prefix: net >= 0 ? "+" : "-",    color: net >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]" },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between">
                 <span className="text-[10px] font-mono text-[var(--ink-3)] tracking-widest">{row.label}</span>
                 <span className={`text-sm font-mono tabular-nums ${row.color}`}>
-                  {row.val >= 0 ? "+" : "-"}${Math.abs(row.val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {row.prefix}${Math.abs(row.val).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             ))}

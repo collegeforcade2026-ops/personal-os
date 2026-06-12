@@ -76,7 +76,7 @@ export async function FinancePulseCard() {
           <div key={row.label}>
             <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">{row.label}</p>
             <p className={`text-xs font-mono tabular ${row.neg ? "text-[var(--danger)]" : "text-[var(--ink-1)]"}`}>
-              {row.neg ? "-" : ""}{fmt(row.val)}
+              {row.neg && row.val > 0 ? "-" : ""}{fmt(row.val)}
             </p>
           </div>
         ))}

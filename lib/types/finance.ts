@@ -33,7 +33,7 @@ export interface NetWorthSnapshot {
 
 // Which bucket each account name belongs to
 export const LIQUID_ACCOUNTS   = ["Checking", "Savings", "HYSA", "Stables"];
-export const INVESTED_ACCOUNTS = ["Equities", "Index", "Crypto", "Private"];
+export const INVESTED_ACCOUNTS = ["Equities", "Index", "Crypto", "Private", "M1 Finance"];
 export const LIABILITY_ACCOUNTS = ["CC Float", "Car Lease", "LOC", "Tax Accrued"];
 
 export function accountBucket(name: string): "liquid" | "invested" | "liability" | "unknown" {

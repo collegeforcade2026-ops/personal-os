@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Balance } from "@/lib/types/finance";
 import { accountBucket, summariseBalances, LIQUID_ACCOUNTS, INVESTED_ACCOUNTS, LIABILITY_ACCOUNTS } from "@/lib/types/finance";
 
@@ -58,6 +58,9 @@ export function BalancesWidget() {
   const [saving, setSaving] = useState(false);
   const [newAccount, setNewAccount] = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [importStatus, setImportStatus] = useState<"idle" | "reading" | "done" | "error">("idle");
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const investmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/finance/balances")
@@ -95,6 +98,35 @@ export function BalancesWidget() {
     setInputVal(String(b.balance));
   }
 
+  async function importInvestmentStatement(file: File) {
+    if (file.type !== "application/pdf") { setImportMsg("PDF only"); setImportStatus("error"); return; }
+    setImportStatus("reading");
+    setImportMsg(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/finance/upload-investment", { method: "POST", body: fd });
+      const data = await res.json() as { ok?: boolean; brokerage?: string; totalValue?: number; updated_at?: string; error?: string };
+      if (!res.ok || !data.ok) {
+        setImportMsg(data.error ?? "Could not read statement");
+        setImportStatus("error");
+      } else {
+        const { brokerage, totalValue, updated_at } = data;
+        setBalances(prev => {
+          const existing = prev.find(b => b.account === brokerage);
+          if (existing) return prev.map(b => b.account === brokerage ? { ...b, balance: totalValue!, updated_at: updated_at ?? "" } : b);
+          return [...prev, { account: brokerage!, balance: totalValue!, updated_at: updated_at ?? "", row: prev.length + 2 }];
+        });
+        setImportMsg(`${brokerage} · $${totalValue?.toLocaleString()} saved`);
+        setImportStatus("done");
+        setTimeout(() => { setImportStatus("idle"); setImportMsg(null); }, 4000);
+      }
+    } catch {
+      setImportMsg("Network error");
+      setImportStatus("error");
+    }
+  }
+
   const summary = summariseBalances(balances);
   const { liquid, invested, liabilities, netWorth } = summary;
 
@@ -116,7 +148,53 @@ export function BalancesWidget() {
 
       <div className="p-4">
         <BucketSection label="Liquid Cash"      accounts={liquidAccounts}    total={liquid}      netWorth={netWorth} onEdit={startEdit} />
-        <BucketSection label="Invested Assets"  accounts={investedAccounts}  total={invested}    netWorth={netWorth} onEdit={startEdit} />
+
+        {/* Invested Assets with statement import */}
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">Invested Assets</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[9px] font-mono text-[var(--ink-3)]">{invested > 0 && netWorth > 0 ? Math.round((invested / netWorth) * 100) : 0}% of net</span>
+              <span className="text-xs font-mono tabular text-[var(--ink-1)]">{invested.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}</span>
+              <button
+                onClick={() => investmentInputRef.current?.click()}
+                disabled={importStatus === "reading"}
+                className="text-[9px] font-mono text-[var(--ink-3)] hover:text-[var(--accent)] disabled:opacity-50 border border-[var(--border)] px-1.5 py-0.5 rounded transition-colors"
+              >
+                {importStatus === "reading" ? "reading…" : "↑ import"}
+              </button>
+              <input
+                ref={investmentInputRef}
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) importInvestmentStatement(f); e.target.value = ""; }}
+              />
+            </div>
+          </div>
+          {importMsg && (
+            <p className={`text-[9px] font-mono px-2 mb-1.5 ${importStatus === "error" ? "text-[var(--danger)]" : "text-[var(--ok)]"}`}>
+              {importStatus === "error" ? "✕ " : "✓ "}{importMsg}
+            </p>
+          )}
+          {investedAccounts.map(b => (
+            <div key={b.account} className="flex items-center justify-between py-1.5 px-2 rounded group hover:bg-[oklch(8%_0_0)] transition-colors">
+              <span className="text-[10px] font-mono text-[var(--ink-2)]">{b.account}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono tabular text-[var(--ink-1)]">
+                  {b.balance.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+                </span>
+                <button onClick={() => startEdit(b)} className="text-[9px] font-mono text-[var(--ink-3)] opacity-0 group-hover:opacity-100 hover:text-[var(--accent)] transition-all">
+                  edit
+                </button>
+              </div>
+            </div>
+          ))}
+          {investedAccounts.length === 0 && (
+            <p className="text-[9px] font-mono text-[var(--ink-3)] italic px-2">None added yet — import a statement or add manually</p>
+          )}
+        </div>
+
         <BucketSection label="Liabilities"      accounts={liabilityAccounts} total={liabilities} netWorth={netWorth} onEdit={startEdit} />
       </div>
 
@@ -182,7 +260,7 @@ export function BalancesWidget() {
           </div>
           <div className="text-right">
             <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase mb-0.5">LIQUID · INVESTED · DEBT</p>
-            <p className="text-[10px] font-mono text-[var(--ink-2)]">{fmt(liquid)} · {fmt(invested)} · -{fmt(liabilities)}</p>
+            <p className="text-[10px] font-mono text-[var(--ink-2)]">{fmt(liquid)} · {fmt(invested)} · {liabilities > 0 ? "-" : ""}{fmt(liabilities)}</p>
           </div>
         </div>
       )}
