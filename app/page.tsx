@@ -10,23 +10,23 @@ import { NutritionCard } from "@/components/dashboard/NutritionCard";
 export default function Home() {
   return (
     <Shell>
-      <div className="grid grid-cols-[280px_1fr_280px] gap-3 h-full min-h-0">
+      <div className="grid grid-cols-[300px_1fr_260px] gap-2.5 h-full min-h-0 p-2.5">
         {/* Left column */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           <OperatorCard />
           <FinancePulseCard />
           <KeyBlockersCard />
         </div>
 
         {/* Centre column */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2.5">
           <SessionCard />
           <HabitsCard />
           <CalendarCard />
         </div>
 
-        {/* Right column */}
-        <div className="flex flex-col gap-3">
+        {/* Right column — Nutrition full height */}
+        <div>
           <NutritionCard />
         </div>
       </div>

@@ -2,27 +2,32 @@
 
 /* ─── oklch colour tokens ─────────────────────────────────────────── */
 :root {
-  /* Neutrals: ink-0 (lightest text) → ink-4 (darkest background) */
+  /* Neutrals */
   --ink-0: oklch(96% 0.004 250);
-  --ink-1: oklch(80% 0.008 250);
-  --ink-2: oklch(55% 0.010 250);
-  --ink-3: oklch(30% 0.010 250);
-  --ink-4: oklch(11% 0.008 250);
+  --ink-1: oklch(75% 0.006 250);
+  --ink-2: oklch(48% 0.008 250);
+  --ink-3: oklch(28% 0.008 250);
+  --ink-4: oklch(4%  0.004 250);
 
-  /* Accent */
-  --accent:     oklch(72% 0.17 160);
-  --accent-dim: oklch(55% 0.13 160);
+  /* Accent — green matching schematic */
+  --accent:     oklch(68% 0.18 150);
+  --accent-dim: oklch(40% 0.12 150);
 
   /* Semantic */
-  --ok:     oklch(72% 0.16 145);
-  --warn:   oklch(78% 0.17 75);
-  --danger: oklch(62% 0.22 25);
+  --ok:     oklch(68% 0.18 150);
+  --warn:   oklch(75% 0.16 72);
+  --danger: oklch(60% 0.22 25);
 
-  /* Surface aliases */
-  --background: var(--ink-4);
+  /* Surfaces — pure black */
+  --background: oklch(4% 0.004 250);
   --foreground: var(--ink-0);
-  --surface:    oklch(15% 0.008 250);
-  --border:     oklch(22% 0.010 250);
+  --surface:    oklch(7% 0.004 250);
+  --border:     oklch(16% 0.006 250);
+
+  /* Heat tag backgrounds */
+  --hot-bg:  oklch(20% 0.08 25);
+  --warm-bg: oklch(20% 0.07 72);
+  --cool-bg: oklch(16% 0.06 220);
 }
 
 @theme inline {
@@ -53,8 +58,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Monospace numbers for data display */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+/* ─── Heat tags ──────────────────────────────────────────────────── */
+.tag-hot  { background: var(--hot-bg);  color: var(--danger); border: 1px solid oklch(35% 0.14 25);  }
+.tag-warm { background: var(--warm-bg); color: var(--warn);   border: 1px solid oklch(35% 0.12 72);  }
+.tag-cool { background: var(--cool-bg); color: oklch(60% 0.12 220); border: 1px solid oklch(30% 0.08 220); }
