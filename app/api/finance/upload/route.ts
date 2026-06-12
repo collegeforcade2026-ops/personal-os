@@ -19,15 +19,12 @@ async function extractTransactions(pdfBase64: string): Promise<Transaction[]> {
     max_tokens: 4096,
     messages: [{
       role: "user",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       content: [
         {
           type: "document",
-          source: {
-            type: "base64",
-            media_type: "application/pdf",
-            data: pdfBase64,
-          },
-        } as Parameters<typeof client.messages.create>[0]["messages"][0]["content"][0],
+          source: { type: "base64", media_type: "application/pdf", data: pdfBase64 },
+        } as any,
         {
           type: "text",
           text: `Extract all transactions from this bank statement and return a JSON array.
@@ -41,7 +38,7 @@ For each transaction return:
 
 Return ONLY a valid JSON array, no markdown, no explanation.`,
         },
-      ],
+      ] as any,
     }],
   });
 
