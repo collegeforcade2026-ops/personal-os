@@ -15,13 +15,15 @@ function fmt(n: number, dec = 0) {
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 
 function Sparkline({ values, color, id }: { values: number[]; color: string; id: string }) {
-  if (values.length < 2) return <div className="h-12 w-full" />;
+  // Need at least 2 points — duplicate single point for a flat line
+  const data = values.length === 0 ? [] : values.length === 1 ? [values[0], values[0]] : values;
+  if (data.length < 2) return <div className="h-12 w-full opacity-20 bg-gradient-to-b from-white/5 to-transparent" />;
   const W = 400; const H = 48;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const min = Math.min(...data);
+  const max = Math.max(...data);
   const range = max - min || 1;
-  const pts = values.map((v, i) => ({
-    x: (i / (values.length - 1)) * W,
+  const pts = data.map((v, i) => ({
+    x: (i / (data.length - 1)) * W,
     y: H - 4 - ((v - min) / range) * (H - 10),
   }));
   const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
@@ -54,24 +56,24 @@ function BucketCard({
     <div className="bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden flex flex-col">
       <div className="p-5 pb-2">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[9px] font-mono text-[#444] tracking-widest">{num} // {label}</span>
-          <span className="text-[9px] font-mono text-[#444]">{pct}% OF NET</span>
+          <span className="text-[9px] font-mono text-[#666] tracking-widest">{num} // {label}</span>
+          <span className="text-[9px] font-mono text-[#666]">{pct}% OF NET</span>
         </div>
         <p className="text-3xl font-mono font-semibold text-white">
-          {isLiability && total > 0 ? "-" : ""}{fmt(total)}
+          {isLiability && total > 0 ? `-${fmt(total)}` : fmt(total)}
         </p>
       </div>
       <Sparkline values={spark} color={sparkColor} id={num} />
       <div className="p-5 pt-4 grid grid-cols-2 gap-x-8 gap-y-4 flex-1">
         {accounts.length > 0 ? accounts.map(b => (
           <div key={b.account} className="group cursor-pointer" onClick={() => onEdit(b)}>
-            <p className="text-[9px] font-mono text-[#444] uppercase tracking-widest mb-0.5">{b.account}</p>
+            <p className="text-[9px] font-mono text-[#666] uppercase tracking-widest mb-0.5">{b.account}</p>
             <p className={`text-sm font-mono group-hover:opacity-70 transition-opacity ${isLiability ? "text-[#e06c6c]" : "text-[#d4d4d4]"}`}>
               {isLiability && Math.abs(b.balance) > 0 ? "-" : ""}{fmt(Math.abs(b.balance))}
             </p>
           </div>
         )) : (
-          <p className="col-span-2 text-[9px] font-mono text-[#333] italic">None added yet</p>
+          <p className="col-span-2 text-[9px] font-mono text-[#555] italic">None added yet</p>
         )}
       </div>
     </div>
@@ -91,7 +93,7 @@ function EditModal({
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
-        <p className="text-[9px] font-mono text-[#444] uppercase tracking-widest mb-5">
+        <p className="text-[9px] font-mono text-[#666] uppercase tracking-widest mb-5">
           {editing ? `Edit · ${editing.account}` : "Add Account"}
         </p>
         {isAdding && (
@@ -99,13 +101,13 @@ function EditModal({
             <input
               type="text" placeholder="Account name" value={newAccount}
               onChange={e => setNewAccount(e.target.value)}
-              className="w-full bg-transparent border-b border-[#2f2f2f] text-sm font-mono text-white focus:outline-none focus:border-[#555] pb-1.5 mb-4 placeholder:text-[#333]"
+              className="w-full bg-transparent border-b border-[#2f2f2f] text-sm font-mono text-white focus:outline-none focus:border-[#555] pb-1.5 mb-4 placeholder:text-[#555]"
             />
             {suggestions.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-4">
                 {suggestions.map(s => (
                   <button key={s} onClick={() => setNewAccount(s)}
-                    className={`text-[9px] font-mono px-2 py-1 rounded-md border transition-colors ${newAccount === s ? "border-green-500/40 text-green-400" : "border-[#222] text-[#444] hover:border-[#3a3a3a] hover:text-[#888]"}`}>
+                    className={`text-[9px] font-mono px-2 py-1 rounded-md border transition-colors ${newAccount === s ? "border-green-500/40 text-green-400" : "border-[#222] text-[#666] hover:border-[#3a3a3a] hover:text-[#888]"}`}>
                     {s}
                   </button>
                 ))}
@@ -114,7 +116,7 @@ function EditModal({
           </>
         )}
         <div className="flex items-center gap-2 mb-5">
-          <span className="text-sm text-[#444] font-mono">$</span>
+          <span className="text-sm text-[#666] font-mono">$</span>
           <input
             autoFocus type="number" value={inputVal}
             onChange={e => setInputVal(e.target.value)}
@@ -128,7 +130,7 @@ function EditModal({
             {saving ? "Saving…" : "Save"}
           </button>
           <button onClick={onClose}
-            className="px-4 text-[11px] font-mono text-[#444] hover:text-white border border-[#222] hover:border-[#333] rounded-xl transition-colors">
+            className="px-4 text-[11px] font-mono text-[#666] hover:text-white border border-[#222] hover:border-[#333] rounded-xl transition-colors">
             Cancel
           </button>
         </div>
@@ -259,14 +261,14 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-6 text-white">
-      <p className="text-[9px] font-mono text-[#444] tracking-[0.2em] uppercase mb-5">Finance</p>
+      <p className="text-[9px] font-mono text-[#666] tracking-[0.2em] uppercase mb-5">Finance</p>
 
       {/* ── Row 1: Stats ───────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-3 mb-3">
 
         {/* Net Worth */}
         <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-5 flex flex-col">
-          <p className="text-[9px] font-mono text-[#444] tracking-widest uppercase mb-3">NET WORTH · LIVE</p>
+          <p className="text-[9px] font-mono text-[#666] tracking-widest uppercase mb-3">NET WORTH · LIVE</p>
           <p className="text-4xl font-mono font-semibold text-white mb-2">{fmt(netWorth)}</p>
           {monthPct && (
             <span className={`self-start text-[9px] font-mono px-2 py-0.5 rounded-md mb-3 ${monthDelta! >= 0 ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -280,24 +282,24 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
 
         {/* Runway */}
         <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-5">
-          <p className="text-[9px] font-mono text-[#444] tracking-widest uppercase mb-3">RUNWAY</p>
+          <p className="text-[9px] font-mono text-[#666] tracking-widest uppercase mb-3">RUNWAY</p>
           <div className="flex items-baseline gap-1.5 mb-2">
             <span className="text-4xl font-mono font-semibold text-white">{runway ?? "—"}</span>
             {runway !== null && <span className="text-lg font-mono text-[#555]">mo</span>}
           </div>
-          <p className="text-[9px] font-mono text-[#3a3a3a] mb-0.5">@ current burn · static</p>
-          {txnSummary && <p className="text-[9px] font-mono text-[#3a3a3a]">{txnSummary.monthLabel}</p>}
+          <p className="text-[9px] font-mono text-[#666] mb-0.5">@ current burn · static</p>
+          {txnSummary && <p className="text-[9px] font-mono text-[#666]">{txnSummary.monthLabel}</p>}
         </div>
 
         {/* Income / Mo */}
         <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-5">
-          <p className="text-[9px] font-mono text-[#444] tracking-widest uppercase mb-3">INCOME / MO</p>
+          <p className="text-[9px] font-mono text-[#666] tracking-widest uppercase mb-3">INCOME / MO</p>
           {txnSummary ? (
             <>
               <p className="text-4xl font-mono font-semibold text-green-400 mb-2">{fmt(txnSummary.totalIncome)}</p>
-              <p className="text-[9px] font-mono text-[#3a3a3a] mb-0.5">{txnSummary.monthLabel}</p>
+              <p className="text-[9px] font-mono text-[#666] mb-0.5">{txnSummary.monthLabel}</p>
               {saveRate !== null && (
-                <p className="text-[9px] font-mono text-[#3a3a3a]">{saveRate}% save rate</p>
+                <p className="text-[9px] font-mono text-[#666]">{saveRate}% save rate</p>
               )}
             </>
           ) : (
@@ -307,12 +309,12 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
 
         {/* Burn / Mo */}
         <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-5">
-          <p className="text-[9px] font-mono text-[#444] tracking-widest uppercase mb-3">BURN / MO</p>
+          <p className="text-[9px] font-mono text-[#666] tracking-widest uppercase mb-3">BURN / MO</p>
           {txnSummary ? (
             <>
               <p className="text-4xl font-mono font-semibold text-[#e06c6c] mb-2">{fmt(txnSummary.totalSpend)}</p>
-              <p className="text-[9px] font-mono text-[#3a3a3a] mb-0.5">{txnSummary.monthLabel}</p>
-              <p className="text-[9px] font-mono text-[#3a3a3a]">top: {txnSummary.topCategory}</p>
+              <p className="text-[9px] font-mono text-[#666] mb-0.5">{txnSummary.monthLabel}</p>
+              <p className="text-[9px] font-mono text-[#666]">top: {txnSummary.topCategory}</p>
             </>
           ) : (
             <p className="text-3xl font-mono text-[#2a2a2a]">$[—]</p>
@@ -334,15 +336,15 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
         <div className="bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden flex flex-col">
           <div className="p-5 pb-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-mono text-[#444] tracking-widest">a2 // INVESTED ASSETS</span>
+              <span className="text-[9px] font-mono text-[#666] tracking-widest">a2 // INVESTED ASSETS</span>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-mono text-[#444]">
+                <span className="text-[9px] font-mono text-[#666]">
                   {netWorth > 0 ? Math.round((invested / netWorth) * 100) : 0}% OF NET
                 </span>
                 <button
                   onClick={() => investmentInputRef.current?.click()}
                   disabled={importStatus === "reading"}
-                  className="text-[9px] font-mono text-[#444] hover:text-green-400 disabled:opacity-30 border border-[#222] px-1.5 py-0.5 rounded transition-colors"
+                  className="text-[9px] font-mono text-[#666] hover:text-green-400 disabled:opacity-30 border border-[#222] px-1.5 py-0.5 rounded transition-colors"
                 >
                   {importStatus === "reading" ? "reading…" : "↑ import"}
                 </button>
@@ -361,7 +363,7 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
           <div className="p-5 pt-4 grid grid-cols-2 gap-x-8 gap-y-4 flex-1">
             {investedAccounts.length > 0 ? investedAccounts.map(b => (
               <div key={b.account} className="group cursor-pointer" onClick={() => startEdit(b)}>
-                <p className="text-[9px] font-mono text-[#444] uppercase tracking-widest mb-0.5">{b.account}</p>
+                <p className="text-[9px] font-mono text-[#666] uppercase tracking-widest mb-0.5">{b.account}</p>
                 <p className="text-sm font-mono text-[#d4d4d4] group-hover:opacity-70 transition-opacity">{fmt(b.balance)}</p>
               </div>
             )) : (
@@ -381,18 +383,18 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
       {/* ── Row 3: Snapshot History ───────────────────────────── */}
       <div className="bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden mb-3">
         <div className="flex items-center justify-between px-6 py-3 border-b border-[#1a1a1a]">
-          <span className="text-[9px] font-mono text-[#444] tracking-widest">a4 // SNAPSHOT HISTORY</span>
-          <span className="text-[9px] font-mono text-[#333]">MONTHLY · {history.length}MO</span>
+          <span className="text-[9px] font-mono text-[#666] tracking-widest">a4 // SNAPSHOT HISTORY</span>
+          <span className="text-[9px] font-mono text-[#555]">MONTHLY · {history.length}MO</span>
         </div>
         {history.length === 0 ? (
-          <p className="px-6 py-5 text-[10px] font-mono text-[#333]">Populates automatically when you save balances.</p>
+          <p className="px-6 py-5 text-[10px] font-mono text-[#555]">Populates automatically when you save balances.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#181818]">
                   {["PERIOD", "NET WORTH", "LIQUID", "INVESTED", "LIABILITIES", "Δ VS PRIOR"].map(h => (
-                    <th key={h} className="text-left text-[9px] font-mono text-[#3a3a3a] tracking-widest uppercase px-6 py-2.5 whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left text-[9px] font-mono text-[#666] tracking-widest uppercase px-6 py-2.5 whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -404,9 +406,9 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
                     <td className="px-6 py-3 font-mono text-[#aaa] text-sm tabular-nums whitespace-nowrap">{fmt(row.liquid)}</td>
                     <td className="px-6 py-3 font-mono text-[#aaa] text-sm tabular-nums whitespace-nowrap">{fmt(row.invested)}</td>
                     <td className="px-6 py-3 font-mono text-[#e06c6c]/70 text-sm tabular-nums whitespace-nowrap">
-                      {row.liabilities > 0 ? `-${fmt(row.liabilities)}` : fmt(row.liabilities)}
+                      {row.liabilities > 0 ? `-${fmt(row.liabilities)}` : "—"}
                     </td>
-                    <td className={`px-6 py-3 font-mono text-sm tabular-nums whitespace-nowrap ${row.delta === 0 ? "text-[#333]" : row.delta > 0 ? "text-green-400" : "text-[#e06c6c]"}`}>
+                    <td className={`px-6 py-3 font-mono text-sm tabular-nums whitespace-nowrap ${row.delta === 0 ? "text-[#555]" : row.delta > 0 ? "text-green-400" : "text-[#e06c6c]"}`}>
                       {row.delta === 0 ? "—" : `${row.delta > 0 ? "+" : ""}${fmt(row.delta)}`}
                     </td>
                   </tr>
@@ -420,7 +422,7 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
       {/* ── Add account button ────────────────────────────────── */}
       <div className="flex justify-end mb-3">
         <button onClick={() => { setShowAdd(true); setEditing(null); setInputVal(""); setNewAccount(""); }}
-          className="text-[9px] font-mono text-[#444] hover:text-white border border-[#1f1f1f] hover:border-[#333] px-3 py-1.5 rounded-lg transition-colors">
+          className="text-[9px] font-mono text-[#666] hover:text-white border border-[#1f1f1f] hover:border-[#333] px-3 py-1.5 rounded-lg transition-colors">
           + add account
         </button>
       </div>
@@ -428,7 +430,7 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
       {/* ── a5: Statement Upload ──────────────────────────────── */}
       <div className="bg-[#111] border border-[#1f1f1f] rounded-xl overflow-hidden">
         <div className="px-6 py-3 border-b border-[#1a1a1a]">
-          <span className="text-[9px] font-mono text-[#444] tracking-widest">a5 // STATEMENT UPLOAD</span>
+          <span className="text-[9px] font-mono text-[#666] tracking-widest">a5 // STATEMENT UPLOAD</span>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-[1fr_280px] gap-6">
