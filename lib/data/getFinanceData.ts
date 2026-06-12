@@ -79,7 +79,7 @@ export async function getFinanceData(): Promise<FinanceRow[]> {
 
   try {
     const token = await getAccessToken();
-    const range = "Sheet1!A:E";
+    const range = "Transactions!A:E";
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
 
     const res = await fetch(url, {

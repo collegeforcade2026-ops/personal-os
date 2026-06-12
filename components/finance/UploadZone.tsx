@@ -58,7 +58,17 @@ export function UploadZone() {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [filename, setFilename] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load persisted transactions from Google Sheet on mount
+  useEffect(() => {
+    fetch("/api/finance/transactions")
+      .then(r => r.json())
+      .then((data: { transactions: Transaction[] }) => setTransactions(data.transactions ?? []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   async function upload(file: File) {
     if (file.type !== "application/pdf") {
@@ -85,7 +95,7 @@ export function UploadZone() {
         setError(json.error ?? "Upload failed");
         setStatus("error");
       } else {
-        setTransactions(json.transactions ?? []);
+        setTransactions(prev => [...prev, ...(json.transactions ?? [])]);
         if (json.warning) setWarning(json.warning);
         setStatus("done");
       }
@@ -141,7 +151,7 @@ export function UploadZone() {
               <p className="text-xs font-mono text-[var(--ok)]">{transactions.length} transactions extracted</p>
               <p className="text-[10px] text-[var(--ink-3)] font-mono">{filename}</p>
               <button
-                onClick={(e) => { e.stopPropagation(); setStatus("idle"); setTransactions([]); setFilename(null); setWarning(null); }}
+                onClick={(e) => { e.stopPropagation(); setStatus("idle"); setFilename(null); setWarning(null); }}
                 className="text-[10px] font-mono text-[var(--ink-3)] hover:text-[var(--ink-1)] border border-[var(--border)] px-3 py-1 rounded mt-1"
               >
                 Upload another
