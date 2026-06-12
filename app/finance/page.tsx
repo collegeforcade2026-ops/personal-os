@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Shell } from "@/components/dashboard/Shell";
-import type { Transaction } from "@/app/api/finance/upload/route";
+import type { Transaction } from "@/lib/types/finance";
 
 type UploadStatus = "idle" | "uploading" | "done" | "error";
 

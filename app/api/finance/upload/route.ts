@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { appendToSheet } from "@/lib/data/writeToSheet";
+import type { Transaction } from "@/lib/types/finance";
 
-export interface Transaction {
-  date: string;
-  description: string;
-  category: string;
-  amount: number;
-  account: string;
-}
+export type { Transaction };
 
 const CATEGORIES = [
   "Housing", "Food & Groceries", "Dining Out", "Transport & Gas",
