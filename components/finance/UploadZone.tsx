@@ -30,10 +30,21 @@ function CategoryBadge({ category }: { category: string }) {
   );
 }
 
+// These categories move money between accounts — not real spend
+const PASS_THROUGH = new Set(["CC Payment", "Transfer"]);
+
+function isRealSpend(t: Transaction) {
+  return t.amount < 0 && !PASS_THROUGH.has(t.category);
+}
+
+function isRealIncome(t: Transaction) {
+  return t.amount > 0 && !PASS_THROUGH.has(t.category);
+}
+
 function groupByCategory(txns: Transaction[]) {
   const map: Record<string, number> = {};
   for (const t of txns) {
-    if (t.amount < 0) {
+    if (isRealSpend(t)) {
       map[t.category] = (map[t.category] ?? 0) + Math.abs(t.amount);
     }
   }
@@ -96,8 +107,8 @@ export function UploadZone() {
     if (file) upload(file);
   }, []);
 
-  const totalIncome = transactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
-  const totalSpend = transactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+  const totalIncome = transactions.filter(isRealIncome).reduce((s, t) => s + t.amount, 0);
+  const totalSpend = transactions.filter(isRealSpend).reduce((s, t) => s + Math.abs(t.amount), 0);
   const net = totalIncome - totalSpend;
   const byCategory = groupByCategory(transactions);
 
