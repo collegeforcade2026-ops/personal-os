@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Balance, BalanceSummary, NetWorthSnapshot } from "@/lib/types/finance";
 import type { TransactionSummary } from "@/lib/data/getTransactionSummary";
 import { accountBucket, summariseBalances, LIQUID_ACCOUNTS, INVESTED_ACCOUNTS, LIABILITY_ACCOUNTS } from "@/lib/types/finance";
@@ -159,6 +160,7 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   const investmentInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   const summary = summariseBalances(balances);
   const { liquid, invested, liabilities, netWorth } = summary;
@@ -224,8 +226,8 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
     try {
       const res = await fetch("/api/finance/clear", { method: "POST" });
       if (res.ok) {
-        setBalances([]);
         setShowClearConfirm(false);
+        router.refresh(); // re-runs server component to pull fresh (empty) data
       }
     } finally {
       setClearing(false);

@@ -56,6 +56,23 @@ export async function POST() {
       return NextResponse.json({ error: "Failed to clear sheets" }, { status: 500 });
     }
 
+    // Restore headers to each tab
+    await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchUpdate`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          valueInputOption: "RAW",
+          data: [
+            { range: "Transactions!A1:E1",       values: [["Date", "Description", "Category", "Amount", "Account"]] },
+            { range: "Balances!A1:C1",            values: [["Account", "Balance", "Updated At"]] },
+            { range: "Net Worth History!A1:F1",   values: [["Period", "Net Worth", "Liquid", "Invested", "Liabilities", "Delta"]] },
+          ],
+        }),
+      }
+    );
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[clear] error:", err);
