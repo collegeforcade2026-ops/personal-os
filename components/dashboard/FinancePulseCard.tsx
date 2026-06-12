@@ -1,79 +1,114 @@
 import Link from "next/link";
 import { Panel } from "./Panel";
 import { getTransactionSummary } from "@/lib/data/getTransactionSummary";
+import { getBalances } from "@/lib/data/getBalances";
 
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+function fmt(n: number, decimals = 0) {
+  return n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: decimals });
 }
 
 export async function FinancePulseCard() {
-  const summary = await getTransactionSummary();
+  const [balances, summary] = await Promise.all([getBalances(), getTransactionSummary()]);
 
-  if (!summary) {
-    return (
-      <Panel label="FINANCE PULSE" labelNum="07">
-        <p className="text-[10px] font-mono text-[var(--ink-3)] mb-3">No data yet.</p>
-        <Link href="/finance" className="text-[10px] font-mono text-[var(--accent)] hover:underline">
-          Upload a statement →
-        </Link>
-      </Panel>
-    );
-  }
+  const checking = balances.find(b => b.account.toLowerCase().includes("checking"));
+  const savings  = balances.find(b => b.account.toLowerCase().includes("saving") || b.account.toLowerCase().includes("hysa"));
+  const brokerage = balances.find(b => b.account.toLowerCase().includes("brokerage") || b.account.toLowerCase().includes("invest"));
+  const cc = balances.find(b => b.account.toLowerCase().includes("credit"));
 
-  const { totalIncome, totalSpend, net, topCategory, monthLabel, transactionCount } = summary;
-  const isPositive = net >= 0;
-  const savingsRate = totalIncome > 0 ? Math.round((net / totalIncome) * 100) : 0;
+  const totalAssets = balances.filter(b => !b.account.toLowerCase().includes("credit")).reduce((s, b) => s + b.balance, 0);
+  const totalDebt = cc ? Math.abs(cc.balance) : 0;
+  const netWorth = totalAssets - totalDebt;
 
-  // Spend bar widths (relative to total spend)
-  const spendPct = totalIncome > 0 ? Math.min(Math.round((totalSpend / totalIncome) * 100), 100) : 0;
+  const { totalIncome, totalSpend, net, topCategory, monthLabel } = summary ?? {};
+  const spendPct = totalIncome && totalSpend ? Math.min(Math.round((totalSpend / totalIncome) * 100), 100) : 0;
+
+  const hasBalances = balances.length > 0;
 
   return (
     <Panel label="FINANCE PULSE" labelNum="07" action={
       <Link href="/finance" className="text-[10px] font-mono text-[var(--ink-3)] hover:text-[var(--ink-1)] tracking-widest uppercase">
-        UPLOAD
+        MANAGE
       </Link>
     }>
-      <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase mb-1">{monthLabel}</p>
+      {!hasBalances ? (
+        <>
+          <p className="text-[10px] font-mono text-[var(--ink-3)] mb-3">No balances saved yet.</p>
+          <Link href="/finance" className="text-[10px] font-mono text-[var(--accent)] hover:underline">
+            Add your accounts →
+          </Link>
+        </>
+      ) : (
+        <>
+          {/* Primary: Checking balance */}
+          {checking && (
+            <div className="mb-3">
+              <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase mb-0.5">CHECKING</p>
+              <span className="text-2xl font-mono tabular text-[var(--ink-0)]">
+                {fmt(checking.balance, 2)}
+              </span>
+            </div>
+          )}
 
-      {/* Net */}
-      <div className="flex items-baseline gap-2 mb-3">
-        <span className={`text-2xl font-mono tabular ${isPositive ? "text-[var(--ok)]" : "text-[var(--danger)]"}`}>
-          {isPositive ? "+" : ""}{fmt(net)}
-        </span>
-        <span className="text-[10px] font-mono text-[var(--ink-3)]">net</span>
-      </div>
+          {/* Account balances grid */}
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {savings && (
+              <div>
+                <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">SAVINGS</p>
+                <p className="text-xs font-mono tabular text-[var(--ink-1)]">{fmt(savings.balance)}</p>
+              </div>
+            )}
+            {brokerage && (
+              <div>
+                <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">BROKERAGE</p>
+                <p className="text-xs font-mono tabular text-[var(--ink-1)]">{fmt(brokerage.balance)}</p>
+              </div>
+            )}
+            {cc && (
+              <div>
+                <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">CC DEBT</p>
+                <p className="text-xs font-mono tabular text-[var(--danger)]">-{fmt(Math.abs(cc.balance))}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">NET WORTH</p>
+              <p className={`text-xs font-mono tabular ${netWorth >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]"}`}>
+                {netWorth >= 0 ? "+" : ""}{fmt(netWorth)}
+              </p>
+            </div>
+          </div>
 
-      {/* Income vs Spend bar */}
-      <div className="mb-3">
-        <div className="flex justify-between text-[9px] font-mono text-[var(--ink-3)] mb-1">
-          <span>SPEND {fmt(totalSpend)}</span>
-          <span>INCOME {fmt(totalIncome)}</span>
-        </div>
-        <div className="h-1 rounded-full bg-[var(--border)] overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${spendPct > 90 ? "bg-[var(--danger)]" : spendPct > 70 ? "bg-[var(--warn)]" : "bg-[var(--ok)]"}`}
-            style={{ width: `${spendPct}%` }}
-          />
-        </div>
-      </div>
+          {/* Divider */}
+          <div className="border-t border-[var(--border)] my-2" />
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">SAVINGS</p>
-          <p className={`text-sm font-mono tabular ${savingsRate >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]"}`}>
-            {savingsRate}%
-          </p>
-        </div>
-        <div>
-          <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">TOP SPEND</p>
-          <p className="text-[10px] font-mono text-[var(--ink-1)] truncate">{topCategory}</p>
-        </div>
-        <div>
-          <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase">TXN</p>
-          <p className="text-sm font-mono tabular text-[var(--ink-1)]">{transactionCount}</p>
-        </div>
-      </div>
+          {/* Monthly cash flow from statement */}
+          {summary ? (
+            <>
+              <p className="text-[9px] font-mono text-[var(--ink-3)] tracking-widest uppercase mb-1">{monthLabel} · CASH FLOW</p>
+              <div className="flex justify-between text-[9px] font-mono text-[var(--ink-3)] mb-1">
+                <span>SPEND {totalSpend ? fmt(totalSpend) : "—"}</span>
+                <span className={net && net >= 0 ? "text-[var(--ok)]" : "text-[var(--danger)]"}>
+                  NET {net ? (net >= 0 ? "+" : "") + fmt(net) : "—"}
+                </span>
+              </div>
+              <div className="h-0.5 rounded-full bg-[var(--border)] overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${spendPct > 90 ? "bg-[var(--danger)]" : spendPct > 70 ? "bg-[var(--warn)]" : "bg-[var(--ok)]"}`}
+                  style={{ width: `${spendPct}%` }}
+                />
+              </div>
+              {topCategory && (
+                <p className="text-[9px] font-mono text-[var(--ink-3)] mt-1.5">
+                  TOP SPEND · <span className="text-[var(--ink-2)]">{topCategory}</span>
+                </p>
+              )}
+            </>
+          ) : (
+            <Link href="/finance" className="text-[9px] font-mono text-[var(--ink-3)] hover:text-[var(--accent)]">
+              Upload a statement to see cash flow →
+            </Link>
+          )}
+        </>
+      )}
     </Panel>
   );
 }
