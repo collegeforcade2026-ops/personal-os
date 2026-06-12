@@ -11,15 +11,7 @@ const CATEGORIES = [
   "Income", "Transfer", "CC Payment", "Savings & Investing", "Other"
 ];
 
-async function parsePdfText(buffer: Buffer): Promise<string> {
-  // Use lib entry directly to avoid pdf-parse loading test files at init (breaks on Vercel)
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (buf: Buffer) => Promise<{ text: string }>;
-  const data = await pdfParse(buffer);
-  return data.text;
-}
-
-async function extractTransactions(rawText: string): Promise<Transaction[]> {
+async function extractTransactions(pdfBase64: string): Promise<Transaction[]> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
   const msg = await client.messages.create({
@@ -27,7 +19,18 @@ async function extractTransactions(rawText: string): Promise<Transaction[]> {
     max_tokens: 4096,
     messages: [{
       role: "user",
-      content: `Extract all transactions from this bank statement text and return a JSON array.
+      content: [
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: "application/pdf",
+            data: pdfBase64,
+          },
+        } as Parameters<typeof client.messages.create>[0]["messages"][0]["content"][0],
+        {
+          type: "text",
+          text: `Extract all transactions from this bank statement and return a JSON array.
 
 For each transaction return:
 - date: "YYYY-MM-DD"
@@ -36,15 +39,13 @@ For each transaction return:
 - amount: number (positive = credit/income, negative = debit/expense)
 - account: "checking" or "savings" or "credit" based on context
 
-Return ONLY a valid JSON array, no markdown, no explanation.
-
-Bank statement text:
-${rawText.slice(0, 12000)}`
-    }]
+Return ONLY a valid JSON array, no markdown, no explanation.`,
+        },
+      ],
+    }],
   });
 
   const raw = (msg.content[0] as { type: string; text: string }).text.trim();
-  // Strip markdown code fences if present
   const cleaned = raw.replace(/^```json?\n?/, "").replace(/\n?```$/, "");
   return JSON.parse(cleaned) as Transaction[];
 }
@@ -71,27 +72,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Only PDF files are supported" }, { status: 400 });
   }
 
-  // Parse PDF
-  let rawText: string;
-  try {
-    const buffer = Buffer.from(await file.arrayBuffer());
-    rawText = await parsePdfText(buffer);
-  } catch (err) {
-    console.error("[finance/upload] PDF parse error:", err);
-    return NextResponse.json({ error: "Could not read PDF" }, { status: 422 });
-  }
+  // Convert PDF to base64 for Claude's document API
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const pdfBase64 = buffer.toString("base64");
 
-  if (!rawText.trim()) {
-    return NextResponse.json({ error: "PDF appears to be empty or scanned (no text layer)" }, { status: 422 });
-  }
-
-  // Extract transactions with Claude
+  // Extract transactions with Claude (reads PDF natively — no pdf-parse needed)
   let transactions: Transaction[];
   try {
-    transactions = await extractTransactions(rawText);
+    transactions = await extractTransactions(pdfBase64);
   } catch (err) {
     console.error("[finance/upload] Extraction error:", err);
-    return NextResponse.json({ error: "Could not extract transactions" }, { status: 500 });
+    return NextResponse.json({ error: "Could not extract transactions from PDF" }, { status: 500 });
   }
 
   // Write to Transactions tab in Google Sheet
@@ -106,7 +97,6 @@ export async function POST(req: NextRequest) {
     await appendToSheet(sheetId, "Transactions", rows);
   } catch (err) {
     console.error("[finance/upload] Sheet write error:", err);
-    // Don't fail — return transactions even if sheet write fails
     return NextResponse.json({
       ok: true,
       transactions,
