@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Transaction } from "@/lib/types/finance";
 
 type UploadStatus = "idle" | "uploading" | "done" | "error";
@@ -58,7 +58,6 @@ export function UploadZone() {
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [filename, setFilename] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Load persisted transactions from Google Sheet on mount
@@ -66,8 +65,7 @@ export function UploadZone() {
     fetch("/api/finance/transactions")
       .then(r => r.json())
       .then((data: { transactions: Transaction[] }) => setTransactions(data.transactions ?? []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .catch(() => {});
   }, []);
 
   async function upload(file: File) {
