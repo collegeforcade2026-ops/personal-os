@@ -45,7 +45,7 @@ export async function getBalances(): Promise<Balance[]> {
     const range = encodeURIComponent("Balances!A:C");
     const res = await fetch(
       `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`,
-      { headers: { Authorization: `Bearer ${token}` }, next: { revalidate: 60 } }
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
     );
     if (!res.ok) return [];
     const data = await res.json() as { values?: string[][] };

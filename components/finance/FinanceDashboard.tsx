@@ -156,6 +156,8 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
   const [saving, setSaving] = useState(false);
   const [importStatus, setImportStatus] = useState<"idle" | "reading" | "done" | "error">("idle");
   const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const investmentInputRef = useRef<HTMLInputElement>(null);
 
   const summary = summariseBalances(balances);
@@ -214,6 +216,19 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
       setShowAdd(false);
       setNewAccount("");
       setInputVal("");
+    }
+  }
+
+  async function clearAllData() {
+    setClearing(true);
+    try {
+      const res = await fetch("/api/finance/clear", { method: "POST" });
+      if (res.ok) {
+        setBalances([]);
+        setShowClearConfirm(false);
+      }
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -419,8 +434,12 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
         )}
       </div>
 
-      {/* ── Add account button ────────────────────────────────── */}
-      <div className="flex justify-end mb-3">
+      {/* ── Add account + Clear ───────────────────────────────── */}
+      <div className="flex justify-end gap-2 mb-3">
+        <button onClick={() => setShowClearConfirm(true)}
+          className="text-[9px] font-mono text-[#555] hover:text-[#e06c6c] border border-[#1f1f1f] hover:border-[#e06c6c]/30 px-3 py-1.5 rounded-lg transition-colors">
+          clear all data
+        </button>
         <button onClick={() => { setShowAdd(true); setEditing(null); setInputVal(""); setNewAccount(""); }}
           className="text-[9px] font-mono text-[#666] hover:text-white border border-[#1f1f1f] hover:border-[#333] px-3 py-1.5 rounded-lg transition-colors">
           + add account
@@ -438,6 +457,29 @@ export function FinanceDashboard({ initialSummary, history, txnSummary }: Props)
           </div>
         </div>
       </div>
+
+      {/* ── Clear confirmation modal ──────────────────────────── */}
+      {showClearConfirm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50" onClick={() => setShowClearConfirm(false)}>
+          <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl p-6 w-80 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <p className="text-[9px] font-mono text-[#666] uppercase tracking-widest mb-3">Confirm Clear</p>
+            <p className="text-sm font-mono text-white mb-1">Delete all finance data?</p>
+            <p className="text-[10px] font-mono text-[#666] mb-5">
+              This clears Transactions, Balances, and Net Worth History from your Google Sheet. Cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={clearAllData} disabled={clearing}
+                className="flex-1 text-[11px] font-mono font-medium text-white bg-[#e06c6c]/20 hover:bg-[#e06c6c]/30 border border-[#e06c6c]/30 disabled:opacity-40 py-2.5 rounded-xl transition-colors">
+                {clearing ? "Clearing…" : "Yes, clear everything"}
+              </button>
+              <button onClick={() => setShowClearConfirm(false)}
+                className="px-4 text-[11px] font-mono text-[#666] hover:text-white border border-[#222] hover:border-[#333] rounded-xl transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit / Add modal ──────────────────────────────────── */}
       {(editing || showAdd) && (

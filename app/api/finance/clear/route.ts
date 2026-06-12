@@ -1,18 +1,13 @@
-import type { NetWorthSnapshot } from "@/lib/types/finance";
+import { NextResponse } from "next/server";
 
 async function getAccessToken(): Promise<string> {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
   const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY!;
   const privateKey = rawKey.replace(/\\n/g, "\n");
   const now = Math.floor(Date.now() / 1000);
+  const scope = "https://www.googleapis.com/auth/spreadsheets";
   const header = { alg: "RS256", typ: "JWT" };
-  const payload = {
-    iss: email,
-    scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
+  const payload = { iss: email, scope, aud: "https://oauth2.googleapis.com/token", exp: now + 3600, iat: now };
   function b64url(obj: object) {
     return Buffer.from(JSON.stringify(obj)).toString("base64")
       .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
@@ -36,36 +31,34 @@ async function getAccessToken(): Promise<string> {
   return ((await tokenRes.json()) as { access_token: string }).access_token;
 }
 
-function periodLabel(period: string): string {
-  // period = "2026-04"
-  const [year, month] = period.split("-");
-  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-  return date.toLocaleString("en-US", { month: "short", year: "numeric" });
-}
-
-export async function getNetWorthHistory(): Promise<NetWorthSnapshot[]> {
+export async function POST() {
   const sheetId = process.env.GOOGLE_SHEETS_FINANCE_ID;
-  if (!sheetId || !process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL) return [];
+  if (!sheetId) return NextResponse.json({ error: "Sheet not configured" }, { status: 500 });
+
   try {
     const token = await getAccessToken();
-    const range = encodeURIComponent("Net Worth History!A:F");
+
+    // Batch clear all three tabs
     const res = await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`,
-      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" }
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchClear`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ranges: ["Transactions!A:Z", "Balances!A:Z", "Net Worth History!A:Z"],
+        }),
+      }
     );
-    if (!res.ok) return [];
-    const data = await res.json() as { values?: string[][] };
-    return (data.values ?? [])
-      .filter(r => /^\d{4}-\d{2}$/.test(r[0] ?? ""))
-      .map(r => ({
-        period: r[0],
-        periodLabel: periodLabel(r[0]),
-        netWorth:    parseFloat(r[1]) || 0,
-        liquid:      parseFloat(r[2]) || 0,
-        invested:    parseFloat(r[3]) || 0,
-        liabilities: parseFloat(r[4]) || 0,
-        delta:       parseFloat(r[5]) || 0,
-      }))
-      .sort((a, b) => b.period.localeCompare(a.period)); // newest first
-  } catch { return []; }
+
+    if (!res.ok) {
+      const err = await res.json();
+      console.error("[clear] sheets error:", err);
+      return NextResponse.json({ error: "Failed to clear sheets" }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("[clear] error:", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }

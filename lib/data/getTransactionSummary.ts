@@ -56,7 +56,7 @@ export async function getTransactionSummary(): Promise<TransactionSummary | null
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
-      next: { revalidate: 300 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
 
