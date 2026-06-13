@@ -35,7 +35,7 @@ function TaskCard({ task, onTaskClick, onTaskComplete, onDragStart, onDragOver, 
     <div
       draggable
       onDragStart={e => onDragStart(e, task)}
-      onDragOver={e => onDragOver(e, task)}
+      onDragOver={e => onDragOver(e)}
       onDrop={e => onDrop(e, task)}
       onClick={() => onTaskClick(task)}
       className={`bg-[var(--background)] border border-[var(--border)] rounded p-3 cursor-pointer hover:border-[var(--accent)] transition-all group ${completing ? "opacity-40 scale-95" : ""}`}
