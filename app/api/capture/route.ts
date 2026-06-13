@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { classifyCapture } from "@/lib/router/classifyCapture";
+import { createTask } from "@/lib/data/tasks";
+import type { Urgency } from "@/lib/types/task";
+import { embedAndStore } from "@/lib/data/embedAndStore";
+
+const URGENCY_MAP: Record<string, Urgency> = {
+  today: "today",
+  this_week: "this-week",
+  this_month: "this-month",
+  someday: "someday",
+};
 
 export async function POST(req: NextRequest) {
   let body: { text?: string };
@@ -40,16 +50,26 @@ export async function POST(req: NextRequest) {
   }
 
   if (classification.kind === "task") {
-    await supabase.from("tasks").insert({
+    const now = new Date().toISOString();
+    await createTask({
+      id: "",
       title: classification.summary,
-      urgency: classification.urgency,
-      tags: classification.tags,
-      user_id: process.env.USER_ID ?? "cade",
+      description: text !== classification.summary ? text : "",
+      urgency: URGENCY_MAP[classification.urgency] ?? "someday",
+      key: false,
+      priorityScore: 0,
+      tags: classification.tags ?? [],
+      dueDate: "",
+      entityId: "",
+      owner: "",
+      completedAt: "",
+      createdAt: now,
+      updatedAt: now,
     });
   }
 
   // Embed to memory (fire and forget)
-  embedToMemory(text, capture.id).catch(console.error);
+  embedAndStore(text, "capture", capture.id).catch(console.error);
 
   await supabase.from("audit_log").insert({
     action: "capture_created",
@@ -60,20 +80,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true, capture: { id: capture.id, ...classification } });
-}
-
-async function embedToMemory(text: string, captureId: string) {
-  const { default: OpenAI } = await import("openai");
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const res = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  await supabase.from("memory_chunks").insert({
-    source_id: captureId,
-    source_type: "capture",
-    text,
-    embedding: res.data[0].embedding,
-    user_id: process.env.USER_ID ?? "cade",
-  });
 }

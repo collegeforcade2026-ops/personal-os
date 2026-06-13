@@ -1,161 +1,99 @@
-import type { Task } from "@/lib/types/task";
+import { supabase } from "@/lib/supabase";
+import type { Task, Urgency } from "@/lib/types/task";
+import { embedAndStore } from "@/lib/data/embedAndStore";
 
-const SHEET_HEADERS = [
-  "ID", "Title", "Description", "Urgency", "Key", "Priority Score",
-  "Tags", "Due Date", "Entity ID", "Owner", "Completed At", "Created At", "Updated At",
-];
+const USER_ID = process.env.USER_ID ?? "cade";
 
-export const TASKS_TAB = "Tasks";
-
-async function getAccessToken(): Promise<string> {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL!;
-  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_KEY!;
-  const privateKey = rawKey.replace(/\\n/g, "\n");
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const payload = {
-    iss: email,
-    scope: "https://www.googleapis.com/auth/spreadsheets",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
-  function b64url(obj: object) {
-    return Buffer.from(JSON.stringify(obj)).toString("base64")
-      .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  }
-  const signingInput = `${b64url(header)}.${b64url(payload)}`;
-  const keyData = privateKey
-    .replace("-----BEGIN PRIVATE KEY-----", "")
-    .replace("-----END PRIVATE KEY-----", "")
-    .replace(/\n/g, "");
-  const cryptoKey = await crypto.subtle.importKey(
-    "pkcs8", Buffer.from(keyData, "base64"),
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]
-  );
-  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", cryptoKey, Buffer.from(signingInput));
-  const sig = Buffer.from(signature).toString("base64")
-    .replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-  const jwt = `${signingInput}.${sig}`;
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
-  });
-  const data = await tokenRes.json() as { access_token: string };
-  return data.access_token;
-}
-
-function rowToTask(row: string[]): Task {
+// Map DB row → Task
+function rowToTask(row: Record<string, unknown>): Task {
   return {
-    id: row[0] ?? "",
-    title: row[1] ?? "",
-    description: row[2] ?? "",
-    urgency: (row[3] as Task["urgency"]) ?? "someday",
-    key: row[4] === "true",
-    priorityScore: parseFloat(row[5]) || 0,
-    tags: row[6] ? row[6].split(",").map(t => t.trim()).filter(Boolean) : [],
-    dueDate: row[7] ?? "",
-    entityId: row[8] ?? "",
-    owner: row[9] ?? "",
-    completedAt: row[10] ?? "",
-    createdAt: row[11] ?? "",
-    updatedAt: row[12] ?? "",
+    id: String(row.id ?? ""),
+    title: String(row.title ?? ""),
+    description: String(row.description ?? ""),
+    urgency: (row.urgency as Urgency) ?? "someday",
+    key: Boolean(row.key),
+    priorityScore: Number(row.priority_score ?? 0),
+    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
+    dueDate: row.due_date ? String(row.due_date) : "",
+    entityId: row.entity_id ? String(row.entity_id) : "",
+    owner: String(row.owner ?? ""),
+    completedAt: row.completed_at ? String(row.completed_at) : "",
+    createdAt: String(row.created_at ?? ""),
+    updatedAt: String(row.updated_at ?? ""),
   };
-}
-
-function taskToRow(task: Task): string[] {
-  return [
-    task.id,
-    task.title,
-    task.description,
-    task.urgency,
-    String(task.key),
-    String(task.priorityScore),
-    task.tags.join(", "),
-    task.dueDate,
-    task.entityId,
-    task.owner,
-    task.completedAt,
-    task.createdAt,
-    task.updatedAt,
-  ];
 }
 
 export async function getTasks(status: "open" | "done" = "open"): Promise<Task[]> {
-  const sheetId = process.env.GOOGLE_SHEETS_FINANCE_ID!;
-  const token = await getAccessToken();
-  const range = encodeURIComponent(`${TASKS_TAB}!A:M`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  const data = await res.json() as { values?: string[][] };
-  const rows = (data.values ?? []).filter(r => r[0] && r[0] !== "ID");
-  const tasks = rows.map(rowToTask);
-  if (status === "open") return tasks.filter(t => !t.completedAt);
-  return tasks.filter(t => !!t.completedAt);
+  const query = supabase
+    .from("tasks")
+    .select("*")
+    .eq("user_id", USER_ID)
+    .order("priority_score", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  const { data, error } = status === "open"
+    ? await query.is("completed_at", null)
+    : await query.not("completed_at", "is", null);
+
+  if (error) { console.error("[getTasks]", error); return []; }
+  return (data ?? []).map(rowToTask);
 }
 
-export async function createTask(task: Task): Promise<void> {
-  const sheetId = process.env.GOOGLE_SHEETS_FINANCE_ID!;
-  const token = await getAccessToken();
+export async function createTask(task: Task): Promise<Task> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      user_id: USER_ID,
+      title: task.title,
+      description: task.description || null,
+      urgency: task.urgency,
+      key: task.key,
+      priority_score: task.priorityScore,
+      tags: task.tags,
+      due_date: task.dueDate || null,
+      owner: task.owner || null,
+    })
+    .select()
+    .single();
 
-  // Ensure Tasks tab has headers
-  await ensureHeaders(sheetId, token);
+  if (error) throw new Error(`createTask failed: ${error.message}`);
 
-  // Insert at row 2 (after header) to put new tasks at top
-  // First get current data to shift rows down
-  const range = encodeURIComponent(`${TASKS_TAB}!A2:M`);
-  const readUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
-  const readRes = await fetch(readUrl, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-  const readData = await readRes.json() as { values?: string[][] };
-  const existingRows = readData.values ?? [];
+  const saved = rowToTask(data as Record<string, unknown>);
 
-  // Write new row + all existing rows starting at A2
-  const allRows = [taskToRow(task), ...existingRows];
-  const writeRange = encodeURIComponent(`${TASKS_TAB}!A2:M${allRows.length + 1}`);
-  const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${writeRange}?valueInputOption=RAW`;
-  await fetch(writeUrl, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ values: allRows }),
-  });
+  // Embed async — don't block response
+  const text = [task.title, task.description].filter(Boolean).join(" — ");
+  embedAndStore(text, "task", saved.id).catch(console.error);
+
+  return saved;
 }
 
 export async function updateTask(id: string, updates: Partial<Task>): Promise<void> {
-  const sheetId = process.env.GOOGLE_SHEETS_FINANCE_ID!;
-  const token = await getAccessToken();
-  const range = encodeURIComponent(`${TASKS_TAB}!A:M`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-  const data = await res.json() as { values?: string[][] };
-  const rows = data.values ?? [];
-  const rowIndex = rows.findIndex(r => r[0] === id);
-  if (rowIndex === -1) return;
+  const patch: Record<string, unknown> = {};
+  if (updates.title       !== undefined) patch.title          = updates.title;
+  if (updates.description !== undefined) patch.description    = updates.description;
+  if (updates.urgency     !== undefined) patch.urgency        = updates.urgency;
+  if (updates.key         !== undefined) patch.key            = updates.key;
+  if (updates.priorityScore !== undefined) patch.priority_score = updates.priorityScore;
+  if (updates.tags        !== undefined) patch.tags           = updates.tags;
+  if (updates.dueDate     !== undefined) patch.due_date       = updates.dueDate || null;
+  if (updates.owner       !== undefined) patch.owner          = updates.owner || null;
+  if (updates.completedAt !== undefined) patch.completed_at   = updates.completedAt || null;
+  patch.updated_at = new Date().toISOString();
 
-  const existing = rowToTask(rows[rowIndex]);
-  const updated = { ...existing, ...updates, updatedAt: new Date().toISOString() };
-  const writeRange = encodeURIComponent(`${TASKS_TAB}!A${rowIndex + 1}:M${rowIndex + 1}`);
-  const writeUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${writeRange}?valueInputOption=RAW`;
-  await fetch(writeUrl, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ values: [taskToRow(updated)] }),
-  });
-}
+  const { error } = await supabase
+    .from("tasks")
+    .update(patch)
+    .eq("id", id)
+    .eq("user_id", USER_ID);
 
-async function ensureHeaders(sheetId: string, token: string): Promise<void> {
-  const range = encodeURIComponent(`${TASKS_TAB}!A1:M1`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}`;
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-  const data = await res.json() as { values?: string[][] };
-  if (data.values?.[0]?.[0] === "ID") return;
-  await fetch(`${url}?valueInputOption=RAW`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ values: [SHEET_HEADERS] }),
-  });
+  if (error) throw new Error(`updateTask failed: ${error.message}`);
+
+  // Re-embed if text changed
+  if (updates.title || updates.description) {
+    const { data } = await supabase.from("tasks").select("title, description").eq("id", id).single();
+    if (data) {
+      const text = [data.title, data.description].filter(Boolean).join(" — ");
+      embedAndStore(text, "task", id).catch(console.error);
+    }
+  }
 }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTasks, createTask } from "@/lib/data/tasks";
 import type { Task } from "@/lib/types/task";
-import { randomUUID } from "crypto";
 
 export async function GET(req: NextRequest) {
   const status = (req.nextUrl.searchParams.get("status") ?? "open") as "open" | "done";
@@ -17,9 +16,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as Partial<Task>;
-    const now = new Date().toISOString();
-    const task: Task = {
-      id: randomUUID(),
+    // Pass a shell task — Supabase generates the real UUID
+    const task = await createTask({
+      id: "",
       title: body.title ?? "Untitled",
       description: body.description ?? "",
       urgency: body.urgency ?? "someday",
@@ -30,10 +29,9 @@ export async function POST(req: NextRequest) {
       entityId: body.entityId ?? "",
       owner: body.owner ?? "",
       completedAt: "",
-      createdAt: now,
-      updatedAt: now,
-    };
-    await createTask(task);
+      createdAt: "",
+      updatedAt: "",
+    });
     return NextResponse.json({ task }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/tasks]", err);

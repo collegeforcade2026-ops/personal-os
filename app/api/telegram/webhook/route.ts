@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { supabase } from "@/lib/supabase";
 import { classifyCapture } from "@/lib/router/classifyCapture";
+import { createTask } from "@/lib/data/tasks";
+import { embedAndStore } from "@/lib/data/embedAndStore";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET!;
@@ -107,18 +109,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Route tasks to tasks table
+  // Route tasks to Google Sheets CRM
   if (classification.kind === "task") {
-    await supabase.from("tasks").insert({
+    const now = new Date().toISOString();
+    // Map classifier urgency (uses underscores) to our Sheets format (hyphens)
+    const urgencyMap: Record<string, string> = {
+      today: "today",
+      this_week: "this-week",
+      this_month: "this-month",
+      someday: "someday",
+    };
+    await createTask({
+      id: "",
       title: classification.summary,
-      urgency: classification.urgency,
-      tags: classification.tags,
-      user_id: process.env.USER_ID ?? "cade",
+      description: rawText !== classification.summary ? rawText : "",
+      urgency: (urgencyMap[classification.urgency] ?? "someday") as import("@/lib/types/task").Urgency,
+      key: false,
+      priorityScore: 0,
+      tags: classification.tags ?? [],
+      dueDate: "",
+      entityId: "",
+      owner: "",
+      completedAt: "",
+      createdAt: now,
+      updatedAt: now,
     });
   }
 
   // Embed to memory_chunks (fire and forget)
-  embedToMemory(rawText, capture.id).catch(console.error);
+  embedAndStore(rawText, "capture", capture.id).catch(console.error);
 
   // Audit log
   await supabase.from("audit_log").insert({
@@ -156,21 +175,4 @@ export async function POST(req: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
-}
-
-async function embedToMemory(text: string, captureId: string) {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const embeddingRes = await openai.embeddings.create({
-    model: "text-embedding-3-small",
-    input: text,
-  });
-  const embedding = embeddingRes.data[0].embedding;
-
-  await supabase.from("memory_chunks").insert({
-    source_id: captureId,
-    source_type: "capture",
-    text,
-    embedding,
-    user_id: process.env.USER_ID ?? "cade",
-  });
 }

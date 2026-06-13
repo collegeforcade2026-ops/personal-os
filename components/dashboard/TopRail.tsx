@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 const TABS = [
   { label: "HOME",    href: "/" },
   { label: "CRM",     href: "/crm" },
+  { label: "BRAIN",   href: "/brain" },
   { label: "FINANCE", href: "/finance" },
   { label: "REVIEW",  href: "/review" },
 ];
