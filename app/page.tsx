@@ -6,6 +6,7 @@ import { SessionCard } from "@/components/dashboard/SessionCard";
 import { HabitsCard } from "@/components/dashboard/HabitsCard";
 import { CalendarCard } from "@/components/dashboard/CalendarCard";
 import { NutritionCard } from "@/components/dashboard/NutritionCard";
+import { GoalsCard } from "@/components/dashboard/GoalsCard";
 
 export default function Home() {
   return (
@@ -25,8 +26,9 @@ export default function Home() {
           <CalendarCard />
         </div>
 
-        {/* Right column — Nutrition full height */}
-        <div>
+        {/* Right column */}
+        <div className="flex flex-col gap-2.5">
+          <GoalsCard />
           <NutritionCard />
         </div>
       </div>
