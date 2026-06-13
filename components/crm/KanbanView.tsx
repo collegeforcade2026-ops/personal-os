@@ -17,7 +17,7 @@ interface TaskCardProps {
   onTaskClick: (task: Task) => void;
   onTaskComplete: (task: Task) => void;
   onDragStart: (e: React.DragEvent, task: Task) => void;
-  onDragOver: (e: React.DragEvent, task: Task) => void;
+  onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, task: Task) => void;
 }
 
@@ -89,15 +89,14 @@ const COL_STYLES: Record<Urgency, { accent: string; label: string }> = {
 
 export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, onReorder }: Props) {
   const [newTitles, setNewTitles] = useState<Partial<Record<Urgency, string>>>({});
+  const [dragOverCol, setDragOverCol] = useState<Urgency | null>(null);
   const dragTask = useRef<Task | null>(null);
 
   function getColumn(urgency: Urgency) {
     return tasks
       .filter(t => t.urgency === urgency)
       .sort((a, b) => {
-        // Key tasks always float to top
         if (a.key !== b.key) return a.key ? -1 : 1;
-        // Then by manual drag-drop priority score
         return b.priorityScore - a.priorityScore;
       });
   }
@@ -107,31 +106,73 @@ export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, o
     e.dataTransfer.effectAllowed = "move";
   }
 
-  function handleDragOver(e: React.DragEvent, _target: Task) {
+  // Card-level drop: insert before/at the target card (works cross-column too)
+  function handleCardDragOver(e: React.DragEvent) {
     e.preventDefault();
+    e.stopPropagation(); // don't trigger column highlight when over a card
     e.dataTransfer.dropEffect = "move";
   }
 
-  function handleDrop(e: React.DragEvent, target: Task) {
+  function handleCardDrop(e: React.DragEvent, target: Task) {
     e.preventDefault();
+    e.stopPropagation();
     const src = dragTask.current;
-    if (!src || src.id === target.id || src.urgency !== target.urgency) return;
+    if (!src || src.id === target.id) return;
 
-    const col = getColumn(src.urgency);
-    const srcIdx = col.findIndex(t => t.id === src.id);
-    const tgtIdx = col.findIndex(t => t.id === target.id);
-    const reordered = [...col];
-    reordered.splice(srcIdx, 1);
-    reordered.splice(tgtIdx, 0, src);
+    const destUrgency = target.urgency;
+    const destCol = getColumn(destUrgency).filter(t => t.id !== src.id);
+    const tgtIdx = destCol.findIndex(t => t.id === target.id);
 
-    // Assign descending priority scores
-    const updates = reordered.map((t, i) => ({ ...t, priorityScore: reordered.length - i }));
+    // Insert src before target in destination column
+    destCol.splice(tgtIdx, 0, { ...src, urgency: destUrgency });
+    const updates = destCol.map((t, i) => ({ ...t, priorityScore: destCol.length - i }));
+
     const newTasks = tasks.map(t => {
       const upd = updates.find(u => u.id === t.id);
       return upd ?? t;
     });
     onReorder(newTasks);
     dragTask.current = null;
+    setDragOverCol(null);
+  }
+
+  // Column-level drop: append to bottom of the column
+  function handleColumnDragOver(e: React.DragEvent, urgency: Urgency) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverCol(urgency);
+  }
+
+  function handleColumnDrop(e: React.DragEvent, urgency: Urgency) {
+    e.preventDefault();
+    const src = dragTask.current;
+    if (!src) return;
+
+    // If same column and dropped on empty space, no-op
+    if (src.urgency === urgency) {
+      dragTask.current = null;
+      setDragOverCol(null);
+      return;
+    }
+
+    // Move to bottom of destination column
+    const destCol = getColumn(urgency);
+    const updatedSrc = { ...src, urgency, priorityScore: 0 };
+    // Shift existing scores up by 1 so new task lands at bottom
+    const newTasks = tasks.map(t => {
+      if (t.id === src.id) return updatedSrc;
+      return t;
+    });
+    onReorder(newTasks);
+    dragTask.current = null;
+    setDragOverCol(null);
+  }
+
+  function handleColumnDragLeave(e: React.DragEvent) {
+    // Only clear if leaving the column entirely (not entering a child)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverCol(null);
+    }
   }
 
   async function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>, urgency: Urgency) {
@@ -148,9 +189,16 @@ export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, o
       {URGENCY_ORDER.map(urgency => {
         const col = getColumn(urgency);
         const style = COL_STYLES[urgency];
+        const isOver = dragOverCol === urgency;
 
         return (
-          <div key={urgency} className="flex flex-col min-h-0">
+          <div
+            key={urgency}
+            className="flex flex-col min-h-0"
+            onDragOver={e => handleColumnDragOver(e, urgency)}
+            onDragLeave={handleColumnDragLeave}
+            onDrop={e => handleColumnDrop(e, urgency)}
+          >
             {/* Column header */}
             <div className="flex items-center justify-between mb-3 shrink-0">
               <div className="flex items-center gap-2">
@@ -162,8 +210,12 @@ export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, o
               <span className="text-[10px] font-mono text-[var(--ink-3)]">{col.length}</span>
             </div>
 
-            {/* Tasks */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-0">
+            {/* Tasks — drop highlight when dragging into column */}
+            <div
+              className={`flex-1 overflow-y-auto space-y-2 pr-1 min-h-0 rounded transition-colors ${
+                isOver ? "bg-[var(--accent-dim)]/20 ring-1 ring-inset ring-[var(--accent)]/30" : ""
+              }`}
+            >
               {col.map(task => (
                 <TaskCard
                   key={task.id}
@@ -171,10 +223,16 @@ export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, o
                   onTaskClick={onTaskClick}
                   onTaskComplete={onTaskComplete}
                   onDragStart={handleDragStart}
-                  onDragOver={handleDragOver}
-                  onDrop={handleDrop}
+                  onDragOver={handleCardDragOver}
+                  onDrop={handleCardDrop}
                 />
               ))}
+              {/* Empty column drop target */}
+              {col.length === 0 && (
+                <div className="h-20 rounded border border-dashed border-[var(--border)] flex items-center justify-center">
+                  <span className="text-[10px] font-mono text-[var(--ink-3)]">drop here</span>
+                </div>
+              )}
             </div>
 
             {/* New task input */}

@@ -122,18 +122,22 @@ export function CRMDashboard({ initialTasks }: Props) {
 
   async function handleReorder(reorderedTasks: Task[]) {
     setTasks(reorderedTasks);
-    // Persist priority scores for changed tasks
+    // Persist any changed fields (urgency and/or priorityScore)
     const changed = reorderedTasks.filter(t => {
       const orig = tasks.find(o => o.id === t.id);
-      return orig && orig.priorityScore !== t.priorityScore;
+      return orig && (orig.priorityScore !== t.priorityScore || orig.urgency !== t.urgency);
     });
-    await Promise.all(changed.map(t =>
-      fetch(`/api/tasks/${t.id}`, {
+    await Promise.all(changed.map(t => {
+      const orig = tasks.find(o => o.id === t.id)!;
+      const patch: Record<string, unknown> = {};
+      if (orig.priorityScore !== t.priorityScore) patch.priorityScore = t.priorityScore;
+      if (orig.urgency !== t.urgency) patch.urgency = t.urgency;
+      return fetch(`/api/tasks/${t.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priorityScore: t.priorityScore }),
-      })
-    ));
+        body: JSON.stringify(patch),
+      });
+    }));
   }
 
   return (
