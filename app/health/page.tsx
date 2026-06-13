@@ -1,3 +1,4 @@
+import { Shell } from "@/components/dashboard/Shell";
 import { HealthDashboard } from "@/components/health/HealthDashboard";
 import type { DayNutrition } from "@/app/api/nutrition/route";
 
@@ -14,5 +15,9 @@ async function getNutritionData(): Promise<DayNutrition[]> {
 
 export default async function HealthPage() {
   const days = await getNutritionData();
-  return <HealthDashboard initialDays={days} />;
+  return (
+    <Shell>
+      <HealthDashboard initialDays={days} />
+    </Shell>
+  );
 }
