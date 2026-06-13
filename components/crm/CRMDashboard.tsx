@@ -109,6 +109,17 @@ export function CRMDashboard({ initialTasks }: Props) {
     setSelectedTask(null);
   }
 
+  async function handleTaskComplete(task: Task) {
+    setTasks(prev => prev.filter(t => t.id !== task.id));
+    try {
+      await fetch(`/api/tasks/${task.id}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Complete failed", err);
+      // Restore on failure
+      setTasks(prev => [...prev, task]);
+    }
+  }
+
   async function handleReorder(reorderedTasks: Task[]) {
     setTasks(reorderedTasks);
     // Persist priority scores for changed tasks
@@ -220,6 +231,7 @@ export function CRMDashboard({ initialTasks }: Props) {
             tasks={tasks}
             onTaskClick={setSelectedTask}
             onTaskCreate={handleTaskCreate}
+            onTaskComplete={handleTaskComplete}
             onReorder={handleReorder}
           />
         )}

@@ -8,18 +8,29 @@ interface Props {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onTaskCreate: (urgency: Urgency) => void;
+  onTaskComplete: (task: Task) => void;
   onReorder: (tasks: Task[]) => void;
 }
 
 interface TaskCardProps {
   task: Task;
   onTaskClick: (task: Task) => void;
+  onTaskComplete: (task: Task) => void;
   onDragStart: (e: React.DragEvent, task: Task) => void;
   onDragOver: (e: React.DragEvent, task: Task) => void;
   onDrop: (e: React.DragEvent, task: Task) => void;
 }
 
-function TaskCard({ task, onTaskClick, onDragStart, onDragOver, onDrop }: TaskCardProps) {
+function TaskCard({ task, onTaskClick, onTaskComplete, onDragStart, onDragOver, onDrop }: TaskCardProps) {
+  const [completing, setCompleting] = useState(false);
+
+  async function handleComplete(e: React.MouseEvent) {
+    e.stopPropagation();
+    setCompleting(true);
+    await new Promise(r => setTimeout(r, 300)); // brief visual feedback
+    onTaskComplete(task);
+  }
+
   return (
     <div
       draggable
@@ -27,16 +38,27 @@ function TaskCard({ task, onTaskClick, onDragStart, onDragOver, onDrop }: TaskCa
       onDragOver={e => onDragOver(e, task)}
       onDrop={e => onDrop(e, task)}
       onClick={() => onTaskClick(task)}
-      className="bg-[var(--background)] border border-[var(--border)] rounded p-3 cursor-pointer hover:border-[var(--accent)] transition-colors group"
+      className={`bg-[var(--background)] border border-[var(--border)] rounded p-3 cursor-pointer hover:border-[var(--accent)] transition-all group ${completing ? "opacity-40 scale-95" : ""}`}
     >
       <div className="flex items-start gap-2">
-        {task.key && (
-          <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" title="Key task" />
-        )}
+        {/* Complete checkbox */}
+        <button
+          onClick={handleComplete}
+          title="Mark done"
+          className="mt-0.5 w-4 h-4 rounded border border-[var(--ink-3)] hover:border-[var(--accent)] hover:bg-[var(--accent-dim)] flex items-center justify-center shrink-0 transition-colors"
+        >
+          {completing && <span className="text-[var(--accent)] text-[9px]">✓</span>}
+        </button>
+
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-[var(--ink-0)] leading-snug group-hover:text-white transition-colors truncate">
-            {task.title}
-          </p>
+          <div className="flex items-center gap-1.5">
+            {task.key && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" title="Key task" />
+            )}
+            <p className="text-sm text-[var(--ink-0)] leading-snug group-hover:text-white transition-colors truncate">
+              {task.title}
+            </p>
+          </div>
           {task.description && (
             <p className="text-[11px] text-[var(--ink-3)] mt-1 line-clamp-2">{task.description}</p>
           )}
@@ -65,14 +87,19 @@ const COL_STYLES: Record<Urgency, { accent: string; label: string }> = {
   "someday":    { accent: "var(--ink-2)",  label: "text-[var(--ink-2)]" },
 };
 
-export function KanbanView({ tasks, onTaskClick, onTaskCreate, onReorder }: Props) {
+export function KanbanView({ tasks, onTaskClick, onTaskCreate, onTaskComplete, onReorder }: Props) {
   const [newTitles, setNewTitles] = useState<Partial<Record<Urgency, string>>>({});
   const dragTask = useRef<Task | null>(null);
 
   function getColumn(urgency: Urgency) {
     return tasks
       .filter(t => t.urgency === urgency)
-      .sort((a, b) => b.priorityScore - a.priorityScore);
+      .sort((a, b) => {
+        // Key tasks always float to top
+        if (a.key !== b.key) return a.key ? -1 : 1;
+        // Then by manual drag-drop priority score
+        return b.priorityScore - a.priorityScore;
+      });
   }
 
   function handleDragStart(e: React.DragEvent, task: Task) {
@@ -142,6 +169,7 @@ export function KanbanView({ tasks, onTaskClick, onTaskCreate, onReorder }: Prop
                   key={task.id}
                   task={task}
                   onTaskClick={onTaskClick}
+                  onTaskComplete={onTaskComplete}
                   onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
