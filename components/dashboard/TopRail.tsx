@@ -9,6 +9,7 @@ const TABS = [
   { label: "CRM",     href: "/crm" },
   { label: "BRAIN",   href: "/brain" },
   { label: "FINANCE", href: "/finance" },
+  { label: "HEALTH",  href: "/health" },
   { label: "REVIEW",  href: "/review" },
 ];
 

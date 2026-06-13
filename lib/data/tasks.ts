@@ -24,12 +24,17 @@ function rowToTask(row: Record<string, unknown>): Task {
 }
 
 export async function getTasks(status: "open" | "done" = "open"): Promise<Task[]> {
+  // Cache-bust: PostgREST edge cache serves stale rows on identical queries.
+  // Adding a varying limit forces a fresh read every time.
+  const bust = 100000 + (Date.now() % 100000);
+
   const query = supabase
     .from("tasks")
     .select("*")
     .eq("user_id", USER_ID)
     .order("priority_score", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(bust);
 
   const { data, error } = status === "open"
     ? await query.is("completed_at", null)
